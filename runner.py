@@ -18,10 +18,3 @@ def load_pages(folder):
 # Load all pages from the specified folder
 pages = load_pages(PAGES_FOLDER)
 
-# Sidebar navigation
-st.sidebar.title("Navigation")
-selected_page = st.sidebar.radio("Go to", list(pages.keys()))
-
-# Display the selected page
-if selected_page in pages:
-    pages[selected_page].data_exploration_page()
