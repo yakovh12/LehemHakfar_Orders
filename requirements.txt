@@ -55,4 +55,4 @@ weasyprint==63.1
 webencodings==0.5.1
 zopfli==0.2.3.post1
 psycopg2-binary==2.9.3
-dotenv==0.19.0
+python-dotenv==0.19.1
