@@ -4,7 +4,7 @@ FROM python:3.10-slim
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy only the requirements file first to leverage Docker cache
+# Copy requirements.txt to the working directory
 COPY requirements.txt .
 
 # Install dependencies
@@ -13,8 +13,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application code into the container
 COPY . .
 
-# Expose the default Streamlit port
-EXPOSE 8501
+# Expose the port that Heroku dynamically assigns
+EXPOSE $PORT
 
-# Run the Streamlit app
-CMD ["streamlit", "run", "runner.py", "--server.port=8501", "--server.address=0.0.0.0"]
+# Set Streamlit environment variables
+ENV STREAMLIT_SERVER_PORT=$PORT
+ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
+ENV STREAMLIT_SERVER_ENABLECORS=false
+
+# Command to run the Streamlit app
+CMD ["streamlit", "run", "runner.py"]
