@@ -4,7 +4,7 @@ FROM python:3.10-slim
 # Set the working directory in the container
 WORKDIR /app
 
-# Install system-level dependencies for libraries like pytesseract and weasyprint
+# Install system-level dependencies
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     libtesseract-dev \
@@ -12,20 +12,20 @@ RUN apt-get update && apt-get install -y \
     libpangocairo-1.0-0 && \
     apt-get clean
 
-# Copy the requirements file and install dependencies
+# Copy the requirements file and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code
 COPY . .
 
-# Expose the port that Heroku dynamically assigns
-EXPOSE $PORT
+# Expose the fixed port (8080)
+EXPOSE 8080
 
-# Streamlit environment variables
-ENV STREAMLIT_SERVER_PORT=$PORT
+# Set Streamlit environment variables
+ENV STREAMLIT_SERVER_PORT=8080
 ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
 ENV STREAMLIT_SERVER_ENABLECORS=false
 
-# Run the Streamlit app
-CMD ["streamlit", "run", "runner.py", "--server.port", "$PORT", "--server.address", "0.0.0.0"]
+# Run the Streamlit app on port 8080
+CMD ["streamlit", "run", "runner.py", "--server.port", "8080", "--server.address", "0.0.0.0"]
