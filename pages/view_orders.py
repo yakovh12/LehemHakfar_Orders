@@ -1,0 +1,85 @@
+import streamlit as st
+import pandas as pd
+from datetime import date
+import xml.etree.ElementTree as ET
+import psycopg2
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+# PostgreSQL database connection details
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+# Function to connect to PostgreSQL and fetch data
+def fetch_data_from_postgres(query):
+    conn = psycopg2.connect(DATABASE_URL, sslmode="require")
+    df = pd.read_sql_query(query, conn)
+    conn.close()
+    return df
+
+def data_exploration_page():
+    st.title("Data Exploration and Export")
+
+    # Fetch orders data
+    orders_query = "SELECT * FROM orders;"
+    orders_df = fetch_data_from_postgres(orders_query)
+
+    if orders_df.empty:
+        st.write("No data available to display.")
+        return
+
+    # Display the dataframe
+    st.header("Orders Data")
+    st.dataframe(orders_df)
+
+    # Filtering options
+    st.subheader("Filter Data")
+    customer_filter = st.text_input("Filter by Customer Name (contains)")
+    date_filter = st.date_input("Filter by Supply Date", value=None)
+
+    filtered_df = orders_df.copy()
+
+    if customer_filter:
+        filtered_df = filtered_df[filtered_df["customer_name"].str.contains(customer_filter, case=False, na=False)]
+
+    if date_filter:
+        # Convert both supply_date and date_filter to the same format
+        filtered_df["supply_date"] = pd.to_datetime(filtered_df["supply_date"]).dt.date
+        filtered_df = filtered_df[filtered_df["supply_date"] == date_filter]
+
+    st.write(f"Filtered {len(filtered_df)} rows.")
+    st.dataframe(filtered_df)
+
+    # Export options
+    st.subheader("Export Data")
+
+    def convert_to_csv(df):
+        return df.to_csv(index=False).encode("utf-8")
+
+    def convert_to_xml(df):
+        root = ET.Element("Orders")
+        for _, row in df.iterrows():
+            item = ET.SubElement(root, "Item")
+            for col in df.columns:
+                ET.SubElement(item, col).text = str(row[col])
+        return ET.tostring(root, encoding="utf-8").decode("utf-8")
+
+    csv_data = convert_to_csv(filtered_df)
+    xml_data = convert_to_xml(filtered_df)
+
+    st.download_button(
+        label="Download as CSV",
+        data=csv_data,
+        file_name="filtered_orders.csv",
+        mime="text/csv",
+    )
+
+    st.download_button(
+        label="Download as XML",
+        data=xml_data,
+        file_name="filtered_orders.xml",
+        mime="application/xml",
+    )
+
+# Directly call the data exploration page
+data_exploration_page()
