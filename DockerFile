@@ -26,6 +26,7 @@ EXPOSE 8080
 ENV STREAMLIT_SERVER_PORT=8080
 ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
 ENV STREAMLIT_SERVER_ENABLECORS=false
+ENV DATABASE_URL=postgres://u37ldn7c41r5qm:pe596a74a2616dd045312c8a51acbff0266d7993e2d416f5a39e9166fd29c5138@ccaml3dimis7eh.cluster-czz5s0kz4scl.eu-west-1.rds.amazonaws.com:5432/d55f0k7o8fa1gt
 
 # Run the Streamlit app
 CMD ["streamlit", "run", "runner.py", "--server.port=8080", "--server.address=0.0.0.0"]
