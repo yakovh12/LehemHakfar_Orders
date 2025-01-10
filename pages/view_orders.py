@@ -17,6 +17,76 @@ def fetch_data_from_postgres(query):
     conn.close()
     return df
 
+def generate_html(df):
+    grouped = df.groupby("customer_name")  # Updated to the correct column name
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="he" dir="rtl">
+    <head>
+        <meta charset="UTF-8">
+        <title>תמצית הזמנות</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 20px;
+                direction: rtl;
+            }
+            .container {
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 20px;
+                page-break-inside: avoid;
+            }
+            .column {
+                border: 1px solid #ddd;
+                padding: 10px;
+                box-sizing: border-box;
+                page-break-inside: avoid;
+            }
+            .order {
+                margin-bottom: 15px;
+            }
+            .order-title {
+                font-size: 24px;
+                font-weight: bold;
+                margin-bottom: 10px;
+                direction: rtl;
+                unicode-bidi: isolate;
+            }
+            .product {
+                font-size: 18px;
+                margin-bottom: 5px;
+                direction: rtl;
+                unicode-bidi: isolate;
+            }
+        </style>
+    </head>
+    <body>
+        <h1 style="text-align: center;">תמצית הזמנות</h1>
+        <div class="container">
+    """
+    for customer_name, group in grouped:
+        reshaped_order_id = f"שם לקוח: {customer_name}"
+        order_html = f"""
+        <div class="order">
+            <div class="order-title">{reshaped_order_id}</div>
+        """
+        for _, row in group.iterrows():
+            product_name = row.get("product_name", "Unknown Product")
+            quantity = str(row.get("quantity", "Unknown Quantity"))
+            order_html += f"""
+            <div class="product">{product_name}: {quantity}</div>
+            """
+        order_html += "</div>"
+        html_content += f'<div class="column">{order_html}</div>'
+    html_content += """
+        </div>
+    </body>
+    </html>
+    """
+    return html_content
+
+
 def data_exploration_page():
     st.title("Data Exploration and Export")
 
@@ -66,6 +136,7 @@ def data_exploration_page():
 
     csv_data = convert_to_csv(filtered_df)
     xml_data = convert_to_xml(filtered_df)
+    html_data = generate_html(filtered_df)
 
     st.download_button(
         label="Download as CSV",
@@ -79,6 +150,13 @@ def data_exploration_page():
         data=xml_data,
         file_name="filtered_orders.xml",
         mime="application/xml",
+    )
+
+    st.download_button(
+        label="Download as HTML",
+        data=html_data,
+        file_name="filtered_orders.html",
+        mime="text/html",
     )
 
 # Directly call the data exploration page

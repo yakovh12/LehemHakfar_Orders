@@ -57,14 +57,14 @@ def get_recommended_products(customer_id):
 
     # Get product details for the recommended products
     if not recent_products.empty:
-        recommended_products = items_df[items_df["ItemKey"].isin(recent_products["product_id"])].to_dict("records")
+        recommended_products = items_df[items_df["product_id"].isin(recent_products["product_id"])].to_dict("records")
     else:
         recommended_products = []
 
     conn.close()
 
     # Add the "New Product" option
-    recommended_products.append({"ItemKey": "NEW", "ItemName": "New Product"})
+    recommended_products.append({"product_id": "NEW", "product_name": "New Product"})
     return recommended_products
 
 # Page title
@@ -75,12 +75,12 @@ st.header("Select Customer")
 customer = st.selectbox(
     "Choose a customer",
     options=customers_df.to_dict("records"),
-    format_func=lambda x: f"{x['AccountKey']} - {x['FullName']}"
+    format_func=lambda x: f"{x['customer_id']} - {x['customer_name']}"
 )
 
 # Product selection with recommendations
 st.header("Select Product")
-recommended_products = get_recommended_products(customer["AccountKey"])
+recommended_products = get_recommended_products(customer["customer_id"])
 
 # Display recommended products
 if recommended_products:
@@ -88,22 +88,22 @@ if recommended_products:
     product_selection = st.multiselect(
         "Choose a product",
         options=recommended_products,
-        format_func=lambda x: f"{x['ItemKey']} - {x['ItemName']}"
+        format_func=lambda x: f"{x['product_id']} - {x['product_name']}"
     )
 else:
     st.write("No recommendations available.")
     product_selection = []
 
 # Handle "New Product" selection
-if any(prod["ItemKey"] == "NEW" for prod in product_selection):
+if any(prod["product_id"] == "NEW" for prod in product_selection):
     st.subheader("Select a New Product")
     all_product_selection = st.multiselect(
         "Choose from all products",
         options=items_df.to_dict("records"),
-        format_func=lambda x: f"{x['ItemKey']} - {x['ItemName']}"
+        format_func=lambda x: f"{x['product_id']} - {x['product_name']}"
     )
     # Add newly selected products to product_selection
-    product_selection = [prod for prod in product_selection if prod["ItemKey"] != "NEW"]
+    product_selection = [prod for prod in product_selection if prod["product_id"] != "NEW"]
     product_selection.extend(all_product_selection)
 
 # Input fields for product
@@ -117,8 +117,8 @@ if st.button("Add to Order"):
     else:
         for selected_product in product_selection:
             product_entry = {
-                "product_id": selected_product["ItemKey"],
-                "product_name": selected_product["ItemName"],
+                "product_id": selected_product["product_id"],
+                "product_name": selected_product["product_name"],
                 "quantity": quantity,
             }
             st.session_state.order_cart.append(product_entry)
@@ -183,8 +183,8 @@ if st.button("Submit Order"):
         for item in st.session_state.order_cart:
             order_entry = {
                 "order_id": order_id,
-                "customer_name": str(customer["FullName"]),  # Customer name
-                "customer_id": str(customer["AccountKey"]),  # Customer ID
+                "customer_name": str(customer["customer_name"]),  # Customer name
+                "customer_id": str(customer["customer_id"]),  # Customer ID
                 "product_id": str(item["product_id"]),       # Product ID
                 "product_name": str(item["product_name"]),   # Product name
                 "quantity": str(item["quantity"]),           # Quantity
