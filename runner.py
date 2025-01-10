@@ -21,4 +21,3 @@ pages = load_pages(PAGES_FOLDER)
 # Display a large title on the main page
 st.markdown("<h1 style='text-align: center;'>Welcome to LehemHakfar Order App</h1>", unsafe_allow_html=True)
 
-
