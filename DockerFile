@@ -13,8 +13,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application code into the container
 COPY . .
 
-# Expose the default port for the app (change as needed)
-EXPOSE 8000
+# Expose the default Streamlit port
+EXPOSE 8501
 
-# Specify the command to run your app
-CMD ["python", "runner.py"]
+# Set Streamlit environment variables (optional, for customization)
+ENV STREAMLIT_HOME=/app
+ENV STREAMLIT_SERVER_PORT=8501
+ENV STREAMLIT_SERVER_ENABLECORS=false
+
+# Run the Streamlit app
+CMD ["streamlit", "run", "runner.py", "--server.port=8501", "--server.address=0.0.0.0"]
