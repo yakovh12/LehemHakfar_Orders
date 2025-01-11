@@ -120,11 +120,15 @@ def data_exploration_page():
     st.write(f"Filtered {len(filtered_df)} rows.")
     st.dataframe(filtered_df)
 
+    # Adding a 'doctype' column to the filtered DataFrame
+    filtered_df["doctype"] = 11
+
     # Export options
     st.subheader("Export Data")
 
     def convert_to_csv(df):
-        return df.to_csv(index=False).encode("utf-8")
+        # Use utf-8-sig encoding for Hebrew support in CSV
+        return df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
 
     def convert_to_xml(df):
         root = ET.Element("Orders")
@@ -159,5 +163,5 @@ def data_exploration_page():
         mime="text/html",
     )
 
-# Directly call the data exploration page
-data_exploration_page()
+    # Directly call the data exploration page
+    data_exploration_page()
