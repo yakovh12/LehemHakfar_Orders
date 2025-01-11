@@ -18,7 +18,7 @@ def fetch_data_from_postgres(query):
     return df
 
 def generate_html(df):
-    grouped = df.groupby("customer_name")  # Updated to the correct column name
+    grouped = df.groupby("customer_name")
     html_content = """
     <!DOCTYPE html>
     <html lang="he" dir="rtl">
@@ -86,7 +86,6 @@ def generate_html(df):
     """
     return html_content
 
-
 def data_exploration_page():
     st.title("Data Exploration and Export")
 
@@ -117,11 +116,11 @@ def data_exploration_page():
         filtered_df["supply_date"] = pd.to_datetime(filtered_df["supply_date"]).dt.date
         filtered_df = filtered_df[filtered_df["supply_date"] == date_filter]
 
+    # Add 'doctype' column
+    filtered_df["doctype"] = 11
+
     st.write(f"Filtered {len(filtered_df)} rows.")
     st.dataframe(filtered_df)
-
-    # Adding a 'doctype' column to the filtered DataFrame
-    filtered_df["doctype"] = 11
 
     # Export options
     st.subheader("Export Data")
@@ -163,5 +162,5 @@ def data_exploration_page():
         mime="text/html",
     )
 
-    # Directly call the data exploration page
-    data_exploration_page()
+# Directly call the data exploration page
+data_exploration_page()
