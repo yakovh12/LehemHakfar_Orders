@@ -4,6 +4,8 @@ import os
 # Define the directory for pages
 page_path = "pages"
 
+port = int(os.environ.get("PORT", 8501))
+
 # Check if the pages directory exists
 if not os.path.exists(page_path):
     raise FileNotFoundError(f"{page_path} directory not found!")
@@ -31,3 +33,5 @@ if os.path.exists(page_file_path):
     exec(open(page_file_path).read())
 else:
     st.write("Selected page not found!")
+
+os.system(f"streamlit run runner.py --server.port={port} --server.address=0.0.0.0")
