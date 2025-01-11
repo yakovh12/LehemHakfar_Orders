@@ -1,91 +1,3 @@
-import streamlit as st
-import pandas as pd
-from datetime import date
-import xml.etree.ElementTree as ET
-import psycopg2
-import os
-from dotenv import load_dotenv
-load_dotenv()
-
-# PostgreSQL database connection details
-DATABASE_URL = os.environ.get("DATABASE_URL")
-
-# Function to connect to PostgreSQL and fetch data
-def fetch_data_from_postgres(query):
-    conn = psycopg2.connect(DATABASE_URL, sslmode="require")
-    df = pd.read_sql_query(query, conn)
-    conn.close()
-    return df
-
-def generate_html(df):
-    grouped = df.groupby("customer_name")
-    html_content = """
-    <!DOCTYPE html>
-    <html lang="he" dir="rtl">
-    <head>
-        <meta charset="UTF-8">
-        <title>תמצית הזמנות</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                margin: 20px;
-                direction: rtl;
-            }
-            .container {
-                display: grid;
-                grid-template-columns: 1fr 1fr 1fr;
-                gap: 20px;
-                page-break-inside: avoid;
-            }
-            .column {
-                border: 1px solid #ddd;
-                padding: 10px;
-                box-sizing: border-box;
-                page-break-inside: avoid;
-            }
-            .order {
-                margin-bottom: 15px;
-            }
-            .order-title {
-                font-size: 24px;
-                font-weight: bold;
-                margin-bottom: 10px;
-                direction: rtl;
-                unicode-bidi: isolate;
-            }
-            .product {
-                font-size: 18px;
-                margin-bottom: 5px;
-                direction: rtl;
-                unicode-bidi: isolate;
-            }
-        </style>
-    </head>
-    <body>
-        <h1 style="text-align: center;">תמצית הזמנות</h1>
-        <div class="container">
-    """
-    for customer_name, group in grouped:
-        reshaped_order_id = f"שם לקוח: {customer_name}"
-        order_html = f"""
-        <div class="order">
-            <div class="order-title">{reshaped_order_id}</div>
-        """
-        for _, row in group.iterrows():
-            product_name = row.get("product_name", "Unknown Product")
-            quantity = str(row.get("quantity", "Unknown Quantity"))
-            order_html += f"""
-            <div class="product">{product_name}: {quantity}</div>
-            """
-        order_html += "</div>"
-        html_content += f'<div class="column">{order_html}</div>'
-    html_content += """
-        </div>
-    </body>
-    </html>
-    """
-    return html_content
-
 def data_exploration_page():
     st.title("Data Exploration and Export")
 
@@ -105,6 +17,8 @@ def data_exploration_page():
     st.subheader("Filter Data")
     customer_filter = st.text_input("Filter by Customer Name (contains)")
     date_filter = st.date_input("Filter by Supply Date", value=None)
+    created_at_start = st.date_input("Created At - Start Date", value=None)
+    created_at_end = st.date_input("Created At - End Date", value=None)
 
     filtered_df = orders_df.copy()
 
@@ -115,6 +29,14 @@ def data_exploration_page():
         # Convert both supply_date and date_filter to the same format
         filtered_df["supply_date"] = pd.to_datetime(filtered_df["supply_date"]).dt.date
         filtered_df = filtered_df[filtered_df["supply_date"] == date_filter]
+
+    # Apply created_at date range filter
+    if created_at_start or created_at_end:
+        filtered_df["created_at"] = pd.to_datetime(filtered_df["created_at"])
+        if created_at_start:
+            filtered_df = filtered_df[filtered_df["created_at"] >= pd.to_datetime(created_at_start)]
+        if created_at_end:
+            filtered_df = filtered_df[filtered_df["created_at"] <= pd.to_datetime(created_at_end)]
 
     # Add 'doctype' column
     filtered_df["doctype"] = 11
