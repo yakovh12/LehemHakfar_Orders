@@ -1,22 +1,33 @@
+import streamlit as st
 import os
-import subprocess
 
-# Define the paths to the main app and a secondary process
-main_page_path = "all_pages.py"
-secondary_script_path = os.path.join("pages")
+# Define the directory for pages
+page_path = "pages"
 
-# Check if the main app file exists
-if not os.path.exists(main_page_path):
-    raise FileNotFoundError(f"{main_page_path} not found!")
+# Check if the pages directory exists
+if not os.path.exists(page_path):
+    raise FileNotFoundError(f"{page_path} directory not found!")
 
-# Check if the secondary script exists
-if not os.path.exists(secondary_script_path):
-    raise FileNotFoundError(f"{secondary_script_path} not found!")
+# Get all .py files in the pages directory, excluding 'runner'
+pages = [
+    file.replace(".py", "").replace("_", " ").title()
+    for file in os.listdir(page_path)
+    if file.endswith(".py") and file != "runner.py"
+]
 
-# Run the Streamlit app with the main page
-print(f"Launching Streamlit app with {main_page_path}...")
-subprocess.run(["streamlit", "run", main_page_path])
+# Add a dropdown or sidebar for page selection
+st.sidebar.title("Navigation")
+selected_page = st.sidebar.selectbox("Select a Page", pages, index=2)
 
-# Run a secondary subprocess (after the first one closes)
-print(f"Launching secondary script with {secondary_script_path}...")
-subprocess.run(["streamlit", "run", secondary_script_path])
+# Display the selected page name
+st.write(f"### {selected_page}")
+st.write("This is the content for the selected page.")
+
+# Run the corresponding page (if dynamic loading is needed)
+page_file = selected_page.lower().replace(" ", "_") + ".py"
+page_file_path = os.path.join(page_path, page_file)
+
+if os.path.exists(page_file_path):
+    exec(open(page_file_path).read())
+else:
+    st.write("Selected page not found!")
