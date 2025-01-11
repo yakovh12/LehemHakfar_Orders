@@ -1,3 +1,6 @@
 build:
   docker:
     web: Dockerfile
+
+run:
+  web: python runner.py  # Replace `python app.py` with your app's startup command
