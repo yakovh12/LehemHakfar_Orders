@@ -3,4 +3,4 @@ build:
     web: Dockerfile
 
 run:
-  web: python runner.py  # Replace `python app.py` with your app's startup command
+  web: streamlit run runner.py --server.port=$PORT --server.address=0.0.0.0 --server.enableCORS=false
