@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
-from datetime import date
+from datetime import date, datetime
 import xml.etree.ElementTree as ET
 import psycopg2
 import os
 from dotenv import load_dotenv
+
 load_dotenv()
 
 query_params = st.query_params
@@ -40,7 +41,7 @@ if "order_cart" not in st.session_state:
 
 if "all_orders" not in st.session_state:
     st.session_state.all_orders = pd.DataFrame(
-        columns=["OrderID", "CustomerID", "CustomerName", "ProductID", "ProductName", "Quantity", "SupplyDate"]
+        columns=["OrderID", "CustomerID", "CustomerName", "ProductID", "ProductName", "Quantity", "SupplyDate", "CreatedAt"]
     )
 
 def get_recommended_products(customer_id):
@@ -53,7 +54,7 @@ def get_recommended_products(customer_id):
     WHERE customer_id = '{customer_id}'
     GROUP BY product_id
     ORDER BY last_order_date DESC
-    LIMIT 5;  -- Limit to 5 most recent products
+    LIMIT 5;
     """
     recent_products = pd.read_sql_query(recent_orders_query, conn)
 
@@ -175,11 +176,9 @@ if st.button("Submit Order"):
         cur = conn.cursor()
 
         # Get the maximum current order ID
-        # Get the maximum current order ID
         cur.execute("SELECT COALESCE(MAX(CAST(order_id AS INTEGER)), 0) FROM orders;")
         max_order_id = cur.fetchone()[0]
         order_id = max_order_id + 1
-
 
         # Create order DataFrame from the cart
         for item in st.session_state.order_cart:
@@ -191,12 +190,13 @@ if st.button("Submit Order"):
                 "product_name": str(item["product_name"]),   # Product name
                 "quantity": str(item["quantity"]),           # Quantity
                 "supply_date": str(supply_date),             # Supply date
+                "created_at": datetime.now().isoformat(),    # Current timestamp
             }
 
             # Insert the order into the orders table
             insert_query = """
-            INSERT INTO orders (order_id, customer_name, customer_id, product_id, product_name, quantity, supply_date)
-            VALUES (%s, %s, %s, %s, %s, %s, %s);
+            INSERT INTO orders (order_id, customer_name, customer_id, product_id, product_name, quantity, supply_date, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
             """
             cur.execute(
                 insert_query,
@@ -208,6 +208,7 @@ if st.button("Submit Order"):
                     order_entry["product_name"],
                     order_entry["quantity"],
                     order_entry["supply_date"],
+                    order_entry["created_at"],
                 ),
             )
 
@@ -224,29 +225,3 @@ if st.button("Submit Order"):
         # Reset order cart
         st.session_state.order_cart = []
         st.success(f"Order #{order_id} submitted successfully and saved to the database!")
-
-# Generate XML
-if st.button("Generate XML"):
-    if st.session_state.all_orders.empty:
-        st.error("No orders available to generate XML.")
-    else:
-        root = ET.Element("Orders")
-
-        for _, row in st.session_state.all_orders.iterrows():
-            item = ET.SubElement(root, "Item")
-            ET.SubElement(item, "order_id").text = str(row["order_id"])
-            ET.SubElement(item, "customer_id").text = str(row["customer_id"])
-            ET.SubElement(item, "product_id").text = str(row["product_id"])
-            ET.SubElement(item, "product_name").text = str(row["product_name"])
-            ET.SubElement(item, "quantity").text = str(row["quantity"])
-            ET.SubElement(item, "supply_date").text = str(row["supply_date"])
-            ET.SubElement(item, "amount").text = "0"
-            ET.SubElement(item, "doc_type").text = "11"
-
-        xml_str = ET.tostring(root, encoding='unicode')
-
-        with open("output.xml", "w", encoding="utf-8") as f:
-            f.write(xml_str)
-
-        st.success("XML file generated successfully: output.xml")
-        st.code(xml_str, language="XML")
