@@ -17,7 +17,7 @@ pages = [
 
 # Add a dropdown or sidebar for page selection
 st.sidebar.title("Navigation")
-selected_page = st.sidebar.selectbox("Select a Page", pages, index=2)
+selected_page = st.sidebar.selectbox("Select a Page", pages, index=1)
 
 # Display the selected page name
 st.write(f"### {selected_page}")
