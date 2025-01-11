@@ -7,6 +7,8 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
+query_params = st.query_params
+
 # PostgreSQL database connection details
 DATABASE_URL = os.environ.get("DATABASE_URL")
 

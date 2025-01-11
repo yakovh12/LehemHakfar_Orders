@@ -1,23 +1,22 @@
-import streamlit as st
 import os
-import importlib
+import subprocess
 
-# Define the folder containing the pages
-PAGES_FOLDER = "pages"
+# Define the paths to the main app and a secondary process
+main_page_path = "all_pages.py"
+secondary_script_path = os.path.join("pages")
 
-# Function to dynamically load and collect all Streamlit pages in the folder
-def load_pages(folder):
-    pages = {}
-    for file_name in os.listdir(folder):
-        if file_name.endswith(".py") and file_name != "runner.py":
-            module_name = file_name[:-3]  # Remove the .py extension
-            module = importlib.import_module(f"{folder}.{module_name}")
-            pages[module_name] = module
-    return pages
+# Check if the main app file exists
+if not os.path.exists(main_page_path):
+    raise FileNotFoundError(f"{main_page_path} not found!")
 
-# Load all pages from the specified folder
-pages = load_pages(PAGES_FOLDER)
+# Check if the secondary script exists
+if not os.path.exists(secondary_script_path):
+    raise FileNotFoundError(f"{secondary_script_path} not found!")
 
-# Display a large title on the main page
-st.markdown("<h1 style='text-align: center;'>Welcome to LehemHakfar Order App</h1>", unsafe_allow_html=True)
+# Run the Streamlit app with the main page
+print(f"Launching Streamlit app with {main_page_path}...")
+subprocess.run(["streamlit", "run", main_page_path])
 
+# Run a secondary subprocess (after the first one closes)
+print(f"Launching secondary script with {secondary_script_path}...")
+subprocess.run(["streamlit", "run", secondary_script_path])

@@ -1,18 +1,17 @@
-# Use the official Python image as the base image
-FROM python:3.10-slim
+# Use the official Python image based on Debian Bullseye for better support
+FROM python:3.10-bullseye
 
 # Set the working directory in the container
 WORKDIR /app
 
-# Install system-level dependencies (PostgreSQL client and Tesseract)
+# Install system-level dependencies (PostgreSQL client, Tesseract, and others)
 RUN apt-get update && \
-    apt-get install -y \
-    libpq-dev \
-    tesseract-ocr \
-    libtesseract-dev \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 && \
-    apt-get clean
+    apt-get install -y wget gnupg && \
+    wget -qO - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - && \
+    echo "deb http://apt.postgresql.org/pub/repos/apt/ bullseye-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
+    apt-get update && \
+    apt-get install -y libpq-dev postgresql-client
+
 
 # Copy the requirements file and install Python dependencies
 COPY requirements.txt .
