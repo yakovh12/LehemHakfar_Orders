@@ -2,7 +2,7 @@
 FROM python:3.10-bullseye
 
 # Set the working directory in the container
-WORKDIR /app
+WORKDIR /web
 
 # Install system-level dependencies (PostgreSQL client, Tesseract, and others)
 RUN apt-get update && \
