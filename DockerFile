@@ -25,4 +25,5 @@ COPY . .
 EXPOSE 8501
 
 # Ensure Streamlit binds to the Heroku-provided $PORT
-CMD ["streamlit", "run", "runner.py", "--server.port=$PORT", "--server.address=0.0.0.0"]
+CMD ["sh", "-c", "streamlit run runner.py --server.port=$PORT --server.address=0.0.0.0"]
+

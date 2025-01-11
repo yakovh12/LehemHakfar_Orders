@@ -32,3 +32,4 @@ if os.path.exists(page_file_path):
 else:
     st.write("Selected page not found!")
 
+port = int(os.environ.get("PORT", 8501))
