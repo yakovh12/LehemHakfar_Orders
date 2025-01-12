@@ -118,13 +118,21 @@ def data_exploration_page():
         filtered_df["supply_date"] = pd.to_datetime(filtered_df["supply_date"]).dt.date
         filtered_df = filtered_df[filtered_df["supply_date"] == date_filter]
 
-    # Apply created_at date range filter
+    created_at_start = st.text_input("Created At - Start Timestamp (YYYY-MM-DD HH:MM:SS)", value=None)
+    created_at_end = st.text_input("Created At - End Timestamp (YYYY-MM-DD HH:MM:SS)", value=None)
+
     if created_at_start or created_at_end:
-        filtered_df["created_at"] = pd.to_datetime(filtered_df["created_at"])
+        filtered_df["created_at"] = pd.to_datetime(filtered_df["created_at"], format="%Y-%m-%d %H:%M:%S", errors="coerce")
+        
         if created_at_start:
-            filtered_df = filtered_df[filtered_df["created_at"] >= pd.to_datetime(created_at_start)]
+            start_timestamp = pd.to_datetime(created_at_start)
+            filtered_df = filtered_df[filtered_df["created_at"] >= start_timestamp]
+
         if created_at_end:
-            filtered_df = filtered_df[filtered_df["created_at"] <= pd.to_datetime(created_at_end)]
+            end_timestamp = pd.to_datetime(created_at_end)
+            filtered_df = filtered_df[filtered_df["created_at"] <= end_timestamp]
+
+
 
     # Add 'doctype' column
     filtered_df["doctype"] = 11
