@@ -2,28 +2,32 @@
 FROM python:3.10-bullseye
 
 # Set the working directory in the container
-WORKDIR /web
+WORKDIR /app
 
 # Install system-level dependencies (PostgreSQL client, Tesseract, and others)
 RUN apt-get update && \
-    apt-get install -y wget gnupg && \
+    apt-get install -y wget gnupg supervisor && \
     wget -qO - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - && \
     echo "deb http://apt.postgresql.org/pub/repos/apt/ bullseye-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
     apt-get update && \
-    apt-get install -y libpq-dev postgresql-client
-
+    apt-get install -y libpq-dev postgresql-client tesseract-ocr && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file and install Python dependencies
 COPY requirements.txt .
-
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code
 COPY . .
 
-# Expose the default port for local testing
-EXPOSE 8501
+# Create logs directory for supervisor
+RUN mkdir -p /app/logs
 
-# Ensure Streamlit binds to the Heroku-provided $PORT
-CMD ["sh", "-c", "streamlit run runner.py --server.port=$PORT --server.address=0.0.0.0"]
+# Expose ports for Flask and Streamlit
+EXPOSE 8080 8501
 
+# Copy supervisor configuration for running both services
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Command to run both services using Supervisor
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
