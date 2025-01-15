@@ -56,3 +56,4 @@ webencodings==0.5.1
 zopfli==0.2.3.post1
 psycopg2==2.9.3
 python-dotenv==0.19.1
+openai==1.59.7
