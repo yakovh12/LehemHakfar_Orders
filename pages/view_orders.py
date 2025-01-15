@@ -128,49 +128,45 @@ def data_exploration_page():
     if customer_filter:
         filtered_df = filtered_df[filtered_df["customer_name"].str.contains(customer_filter, case=False, na=False)]
 
-    if date_filter:
-        # Convert both supply_date and date_filter to the same format
-        filtered_df["supply_date"] = pd.to_datetime(filtered_df["supply_date"]).dt.date
+    if date_filter and "supply_date" in filtered_df.columns:
+        filtered_df["supply_date"] = pd.to_datetime(filtered_df["supply_date"], errors="coerce").dt.date
         filtered_df = filtered_df[filtered_df["supply_date"] == date_filter]
 
-    if created_at_start or created_at_end:
+    if created_at_start or created_at_end and "created_at" in filtered_df.columns:
         filtered_df["created_at"] = pd.to_datetime(filtered_df["created_at"], format="%Y-%m-%d %H:%M:%S", errors="coerce")
-        
         if created_at_start:
-            start_timestamp = pd.to_datetime(created_at_start)
-            filtered_df = filtered_df[filtered_df["created_at"] >= start_timestamp]
-
+            filtered_df = filtered_df[filtered_df["created_at"] >= pd.to_datetime(created_at_start)]
         if created_at_end:
-            end_timestamp = pd.to_datetime(created_at_end)
-            filtered_df = filtered_df[filtered_df["created_at"] <= end_timestamp]
+            filtered_df = filtered_df[filtered_df["created_at"] <= pd.to_datetime(created_at_end)]
 
-    # Add 'doctype' column
+    # Add static column
     filtered_df["doctype"] = 11
 
     st.write(f"Filtered {len(filtered_df)} rows.")
     st.dataframe(filtered_df)
 
-    # New Section: Sum by Product ID and Product Name
-    st.subheader("Sum by Product")
+    # Aggregation
     if "quantity" in filtered_df.columns:
+        filtered_df["quantity"] = pd.to_numeric(filtered_df["quantity"], errors="coerce").fillna(0)
         sum_by_product = (
             filtered_df.groupby(["product_id", "product_name"])["quantity"]
             .sum()
             .reset_index()
             .sort_values(by="quantity", ascending=False)
         )
+        st.write("Top Products by Quantity")
         st.dataframe(sum_by_product)
 
-        # Export the aggregated data
+            # Export the aggregated data
         sum_csv_data = convert_to_csv(sum_by_product)
         st.download_button(
-            label="Download Sum by Product as CSV",
-            data=sum_csv_data,
-            file_name="sum_by_product.csv",
-            mime="text/csv",
-        )
+                label="Download Sum by Product as CSV",
+                data=sum_csv_data,
+                file_name="sum_by_product.csv",
+                mime="text/csv",
+            )
     else:
-        st.write("The 'quantity' column is missing. Unable to calculate sum by product.")
+            st.write("The 'quantity' column is missing. Unable to calculate sum by product.")
 
     # Export options
     st.subheader("Export Data")
