@@ -29,7 +29,7 @@ def get_customer_from_input(client, user_input):
     customer_json = customers_df.to_dict('records')
     prompt = f"""
     You are a supervisor of AI agents. Your mission is to understand from the user input which company it is related to 
-    and to send it to the correct AI agent expert. You do this by returning only the exact customer_id from the following list:
+    and to send it to the correct AI agent expert. You do this by returning only the exact customer_id as number from the following list:
     {customer_json}
     If you are unsure or can't determine the company, respond with "unknown".
     """
@@ -52,7 +52,15 @@ def get_customer_prompt(customer_id):
     FROM customer_prompts
     WHERE customer_id = '{customer_id}';
     """
-    return fetch_data_from_postgres(query)
+    # Fetch the data as a DataFrame
+    result = fetch_data_from_postgres(query)
+    
+    # Extract the value from the DataFrame if it exists
+    if not result.empty and 'open_ai_prompt' in result.columns:
+        return result['open_ai_prompt'].iloc[0]  # Get the first value in the 'open_ai_prompt' column
+    else:
+        return None  # Return None if no results are found
+
 
 def get_next_weekday(weekday_name):
     """Get the next occurrence of the specified weekday."""
@@ -62,41 +70,56 @@ def get_next_weekday(weekday_name):
     days_ahead = (target_day - today.weekday() + 7) % 7
     return today + timedelta(days=days_ahead if days_ahead > 0 else 7)
 
-def parse_order(input_text, customer_id,customer_prompts):
+def parse_order(input_text, customer_id, customer_prompts):
     """Parse the order using OpenAI chat completion."""
     today_date = datetime.now().strftime("%Y-%m-%d")
     weekday = datetime.now().strftime("%A")
 
     # Construct the prompt
-    prompt = f"""
-    1. Order Date: Always use {today_date}.
-    2. Delivery Date: If a date is mentioned, use it. If a day is mentioned (e.g., Monday), calculate the next occurrence of that day. If no date is provided, use today’s date.
-    3. Customer ID: {customer_id}
-    4. SKU and quantity: according to the specific instructions for this customer.
-    {customer_prompts}
-
-    Output Columns:
-    - "order_id": Incremental order ID starting from 1.
-    - "customer_name": Name of the customer (e.g., Garage Tel Aviv).
-    - "customer_id": Resolved ID of the customer.
-    - "product_id": Product ID (e.g., SKU 15001 for bread).
-    - "product_name": Name of the product (e.g., Bread).
-    - "quantity": Quantity in units.
-    - "supply_date": Calculated delivery date.
-
-    Input:
-    {input_text}
-
-    Provide the output in JSON format with the specified columns.
+    system_prompt = f"""
+    you are AI agent that processes orders. you mission is receive order as it sent from the customer and to parse it to a valid JSON structure.
+    There are general instructions that you should follow:
+    1. Supply Date: If a date is mentioned, use it. If a day is mentioned (e.g., Monday), calculate the next occurrence of that day. If no date is provided, use today’s date which is {today_date}
+    2. Customer ID: {customer_id}
+    3. Customer Name: it doesnt matter what you return because we map the customer_id to the customer_name.
+    3. Product ID: you will receive it in specific instcructions.
+    4. Product Name: it doesnt matter what you return because we map the product_id to the product_name.
+    5. Quantity: you will receive it in specific instructions.
+    6. order_id: it doesnt matter what you return because we map the product id to the product name.
+    
+    Output JSON Example:
+    3. Example output for multiple products:
+[
+    {{
+        "order_id": "1",
+        "customer_name": "Customer A",
+        "customer_id": "1001",
+        "product_id": "2001",
+        "product_name": "Bread",
+        "quantity": 400,
+        "supply_date": "2025-01-16"
+    }},
+    {{
+        "order_id": "2",
+        "customer_name": "Customer A",
+        "customer_id": "1001",
+        "product_id": "2002",
+        "product_name": "Roll",
+        "quantity": 80,
+        "supply_date": "2025-01-16"
+    }}
+]
     """
-
     # Call OpenAI API
-    response = client.chat.completions.create(model="gpt-3.5-turbo",
+    response = client.chat.completions.create(model="gpt-4",
     messages=[
-        {"role": "system", "content": f"""You are a helpful assistant that processes orders. Today is {today_date}, Weekday: {weekday}.
-        Parse the following order information and provide the output table:"""},
-        {"role": "user", "content": prompt}
-    ])
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content":f"specific instruction: {customer_prompts}"},
+        {"role": "assistant", "content": "OK"},
+        {"role": "user", "content":f"user input:{input_text}"}
+    ]
+    ,temperature=0.0
+    )
 
     # Extract and return the response
     return response.choices[0].message.content
@@ -330,13 +353,22 @@ if st.button("Process Prompt"):
     if order_input.strip():
         try:
             customer_id = get_customer_from_input(client, order_input)
+            st.write(f"Customer ID: {customer_id}")
+            if customer_id == "unknown":
+                raise ValueError("Customer ID could not be determined.")
+
 
             customer_prompts = get_customer_prompt(customer_id)
+            st.write(f"Customer Prompts: {customer_prompts}")
+
             
 
             # Simulate `parse_order` response for demonstration
-            result = parse_order(order_input, customer_id, customer_prompts)  # Replace with actual function
+            result = parse_order(order_input, customer_id, customer_prompts)
+            result = json.loads(result)
 
+            st.write(result)
+        
             # Parse the AI response
             if isinstance(result, str):
                 try:
@@ -349,32 +381,44 @@ if st.button("Process Prompt"):
             st.json(result)
 
             # Flatten the dictionary and convert to DataFrame
-            if isinstance(result, dict):
+            if isinstance(result, list):  # Handle multiple products
+                flattened_results = [flatten_dict(item) for item in result]  # Flatten each dictionary
+                df = pd.DataFrame(flattened_results)  # Create DataFrame from the list of flattened dictionaries
+            elif isinstance(result, dict):  # Handle a single product
                 flattened_result = flatten_dict(result)
-                df = pd.DataFrame([flattened_result])
+                df = pd.DataFrame([flattened_result])  # Create DataFrame with one row
+            else:
+                raise ValueError("Unexpected response format. Expected a dictionary or list of dictionaries.")
 
-                # Format dates
-                if "supply_date" in df.columns:
-                    df["supply_date"] = pd.to_datetime(df["supply_date"]).dt.strftime('%Y-%m-%d')
-                df["created_at"] = datetime.now().isoformat()
-                df["product_id"] = df["product_id"].astype(str)
-                df["customer_id"] = df["customer_id"].astype(str)
-                df["customer_name"] = customers_df[customers_df["customer_id"] == df["customer_id"].values[0]]["customer_name"].values[0]
-                df["product_name"] = items_df[items_df["product_id"] == df["product_id"].values[0]]["product_name"].values[0]
-               
-                # Generate an order ID
-                conn = psycopg2.connect(DATABASE_URL, sslmode="require")
-                cur = conn.cursor()
-                cur.execute("SELECT COALESCE(MAX(CAST(order_id AS INTEGER)), 0) FROM orders;")
-                max_order_id = cur.fetchone()[0]
-                df["order_id"] = max_order_id + 1
-                df["order_id"] = df["order_id"].astype(str)
+            # Format dates
+            if "supply_date" in df.columns:
+                df["supply_date"] = pd.to_datetime(df["supply_date"]).dt.strftime('%Y-%m-%d')
+            df["created_at"] = datetime.now().isoformat()
 
-                conn.close()
+            # Convert necessary fields to strings
+            df["product_id"] = df["product_id"].astype(str)
+            df["customer_id"] = df["customer_id"].astype(str)
 
-                # Save the DataFrame to session state for review
-                st.session_state.parsed_df = df
-                st.success("Data parsed successfully! Review the data below before submitting.")
+            # Map customer_name and product_name from external DataFrames
+            df["customer_name"] = df["customer_id"].map(lambda x: customers_df[customers_df["customer_id"] == x]["customer_name"].values[0])
+            df["product_name"] = df["product_id"].map(lambda x: items_df[items_df["product_id"] == x]["product_name"].values[0])
+
+            # Generate unique order IDs
+            conn = psycopg2.connect(DATABASE_URL, sslmode="require")
+            cur = conn.cursor()
+            cur.execute("SELECT COALESCE(MAX(CAST(order_id AS INTEGER)), 0) FROM orders;")
+            max_order_id = cur.fetchone()[0]
+
+            # Assign unique order_id for each row
+            df["order_id"] = range(max_order_id + 1, max_order_id + 1 + len(df))
+            df["order_id"] = df["order_id"].astype(str)
+
+            # Close the database connection
+            conn.close()
+
+            # Save the DataFrame to session state for review
+            st.session_state.parsed_df = df
+            st.success("Data parsed successfully! Review the data below before submitting.")
 
         except Exception as e:
             st.error(f"An unexpected error occurred: {e}")
