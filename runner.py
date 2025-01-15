@@ -49,6 +49,13 @@ else:
     st.sidebar.title(f"Welcome, {st.session_state.username}!")
     st.sidebar.title("Navigation")
 
+    # Ensure the default page is 'All Pages'
+    default_page = "All Pages"
+
+    # Check if the default page exists in the list
+    if default_page.lower().replace(" ", "_") + ".py" not in os.listdir(page_path):
+        raise FileNotFoundError(f"The default page '{default_page}' does not exist in the pages directory!")
+
     # Get all .py files in the pages directory, excluding 'runner'
     pages = [
         file.replace(".py", "").replace("_", " ").title()
@@ -56,7 +63,12 @@ else:
         if file.endswith(".py") and file != "runner.py"
     ]
 
-    selected_page = st.sidebar.selectbox("Select a Page", pages, index=0)
+    # Ensure the default page is included
+    if default_page not in pages:
+        pages.insert(0, default_page)
+
+    # Pre-select 'All Pages' on the first load
+    selected_page = st.sidebar.selectbox("Select a Page", pages, index=pages.index(default_page))
 
     # Display the selected page name
     st.write(f"### {selected_page}")

@@ -10,6 +10,18 @@ load_dotenv()
 # PostgreSQL database connection details
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
+def convert_to_csv(df):
+    # Use utf-8-sig encoding for Hebrew support in CSV
+    return df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+
+def convert_to_xml(df):
+    root = ET.Element("Orders")
+    for _, row in df.iterrows():
+        item = ET.SubElement(root, "Item")
+        for col in df.columns:
+            ET.SubElement(item, col).text = str(row[col])
+    return ET.tostring(root, encoding="utf-8").decode("utf-8")
+
 # Function to connect to PostgreSQL and fetch data
 def fetch_data_from_postgres(query):
     conn = psycopg2.connect(DATABASE_URL, sslmode="require")
@@ -19,50 +31,51 @@ def fetch_data_from_postgres(query):
 
 def generate_html(df):
     grouped = df.groupby("customer_name")
-    html_content = """
+    supply_date = df["supply_date"].iloc[0]
+    html_content = f"""
     <!DOCTYPE html>
     <html lang="he" dir="rtl">
     <head>
         <meta charset="UTF-8">
         <title>תמצית הזמנות</title>
         <style>
-            body {
+            body {{
                 font-family: Arial, sans-serif;
                 margin: 20px;
                 direction: rtl;
-            }
-            .container {
+            }}
+            .container {{
                 display: grid;
                 grid-template-columns: 1fr 1fr 1fr;
                 gap: 20px;
                 page-break-inside: avoid;
-            }
-            .column {
+            }}
+            .column {{
                 border: 1px solid #ddd;
                 padding: 10px;
                 box-sizing: border-box;
                 page-break-inside: avoid;
-            }
-            .order {
+            }}
+            .order {{
                 margin-bottom: 15px;
-            }
-            .order-title {
+            }}
+            .order-title {{
                 font-size: 24px;
                 font-weight: bold;
                 margin-bottom: 10px;
                 direction: rtl;
                 unicode-bidi: isolate;
-            }
-            .product {
+            }}
+            .product {{
                 font-size: 18px;
                 margin-bottom: 5px;
                 direction: rtl;
                 unicode-bidi: isolate;
-            }
+            }}
         </style>
     </head>
     <body>
-        <h1 style="text-align: center;">תמצית הזמנות</h1>
+        <h1 style="text-align: center;">הזמנות לתאריך: {supply_date} </h1>
         <div class="container">
     """
     for customer_name, group in grouped:
@@ -72,10 +85,11 @@ def generate_html(df):
             <div class="order-title">{reshaped_order_id}</div>
         """
         for _, row in group.iterrows():
+            product_id = row.get("product_id", "Unknown Product ID")
             product_name = row.get("product_name", "Unknown Product")
             quantity = str(row.get("quantity", "Unknown Quantity"))
             order_html += f"""
-            <div class="product">{product_name}: {quantity}</div>
+            <div class="product">{product_id} {product_name}: {quantity}</div>
             """
         order_html += "</div>"
         html_content += f'<div class="column">{order_html}</div>'
@@ -105,8 +119,9 @@ def data_exploration_page():
     st.subheader("Filter Data")
     customer_filter = st.text_input("Filter by Customer Name (contains)")
     date_filter = st.date_input("Filter by Supply Date", value=None)
-    created_at_start = st.date_input("Created At - Start Date", value=None)
-    created_at_end = st.date_input("Created At - End Date", value=None)
+
+    created_at_start = st.text_input("Created At - Start Timestamp (YYYY-MM-DD HH:MM:SS)", value=None)
+    created_at_end = st.text_input("Created At - End Timestamp (YYYY-MM-DD HH:MM:SS)", value=None)
 
     filtered_df = orders_df.copy()
 
@@ -117,9 +132,6 @@ def data_exploration_page():
         # Convert both supply_date and date_filter to the same format
         filtered_df["supply_date"] = pd.to_datetime(filtered_df["supply_date"]).dt.date
         filtered_df = filtered_df[filtered_df["supply_date"] == date_filter]
-
-    created_at_start = st.text_input("Created At - Start Timestamp (YYYY-MM-DD HH:MM:SS)", value=None)
-    created_at_end = st.text_input("Created At - End Timestamp (YYYY-MM-DD HH:MM:SS)", value=None)
 
     if created_at_start or created_at_end:
         filtered_df["created_at"] = pd.to_datetime(filtered_df["created_at"], format="%Y-%m-%d %H:%M:%S", errors="coerce")
@@ -132,28 +144,36 @@ def data_exploration_page():
             end_timestamp = pd.to_datetime(created_at_end)
             filtered_df = filtered_df[filtered_df["created_at"] <= end_timestamp]
 
-
-
     # Add 'doctype' column
     filtered_df["doctype"] = 11
 
     st.write(f"Filtered {len(filtered_df)} rows.")
     st.dataframe(filtered_df)
 
+    # New Section: Sum by Product ID and Product Name
+    st.subheader("Sum by Product")
+    if "quantity" in filtered_df.columns:
+        sum_by_product = (
+            filtered_df.groupby(["product_id", "product_name"])["quantity"]
+            .sum()
+            .reset_index()
+            .sort_values(by="quantity", ascending=False)
+        )
+        st.dataframe(sum_by_product)
+
+        # Export the aggregated data
+        sum_csv_data = convert_to_csv(sum_by_product)
+        st.download_button(
+            label="Download Sum by Product as CSV",
+            data=sum_csv_data,
+            file_name="sum_by_product.csv",
+            mime="text/csv",
+        )
+    else:
+        st.write("The 'quantity' column is missing. Unable to calculate sum by product.")
+
     # Export options
     st.subheader("Export Data")
-
-    def convert_to_csv(df):
-        # Use utf-8-sig encoding for Hebrew support in CSV
-        return df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-
-    def convert_to_xml(df):
-        root = ET.Element("Orders")
-        for _, row in df.iterrows():
-            item = ET.SubElement(root, "Item")
-            for col in df.columns:
-                ET.SubElement(item, col).text = str(row[col])
-        return ET.tostring(root, encoding="utf-8").decode("utf-8")
 
     csv_data = convert_to_csv(filtered_df)
     xml_data = convert_to_xml(filtered_df)
