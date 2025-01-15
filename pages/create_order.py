@@ -410,7 +410,7 @@ if st.button("Process Prompt"):
             max_order_id = cur.fetchone()[0]
 
             # Assign unique order_id for each row
-            df["order_id"] = range(max_order_id + 1, max_order_id + 1 + len(df))
+            df["order_id"] = max_order_id + 1
             df["order_id"] = df["order_id"].astype(str)
 
             # Close the database connection
