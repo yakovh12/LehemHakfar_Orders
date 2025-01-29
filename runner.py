@@ -1,84 +1,102 @@
 import streamlit as st
 import os
-import dotenv
+from google.oauth2 import id_token
+from google_auth_oauthlib.flow import Flow
+import google.auth.transport.requests
+from dotenv import load_dotenv
+import base64
+import json
 
-# Load environment variables
-dotenv.load_dotenv()
+# Load .env file
+load_dotenv()
 
-# Load username and password from environment variables
-USERNAME = os.getenv("USERNAME", "default_user")  # Default username for testing
-PASSWORD = os.getenv("PASSWORD", "default_pass")  # Default password for testing
+# Retrieve and decode Google OAuth JSON credentials
+encoded_json = os.getenv("GOOGLE_CLIENT_SECRET_JSON")
 
-# Define the directory for pages
-page_path = "pages"
+if not encoded_json:
+    raise ValueError("Error: GOOGLE_CLIENT_SECRET_JSON environment variable not found!")
 
-# Check if the pages directory exists
-if not os.path.exists(page_path):
-    raise FileNotFoundError(f"{page_path} directory not found!")
+# Parse JSON credentials directly into a dictionary
+decoded_json = json.loads(base64.b64decode(encoded_json).decode("utf-8"))
 
-# Function to verify login
-def verify_login(username, password):
-    return username == USERNAME and password == PASSWORD
+# Use credentials dictionary instead of a file
+flow = Flow.from_client_config(
+    decoded_json,
+    scopes=["openid", "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"],
+    redirect_uri="http://localhost:8501"
+)
 
-# Login form
+# Initialize session state
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
+st.title("Lehem Hakfar Orders")
+
 if not st.session_state.logged_in:
-    st.title("Login")
+    auth_url, _ = flow.authorization_url(prompt="consent")
+    st.markdown(f'<a href="{auth_url}" target="_self"><button>Login with Google</button></a>', unsafe_allow_html=True)
 
-    with st.form("login_form"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        submitted = st.form_submit_button("Login")
+    # Handle callback
+    query_params = st.query_params
 
-    if submitted:
-        if verify_login(username, password):
-            st.success("Login successful!")
-            st.session_state.logged_in = True
-            st.session_state.username = username
-        else:
-            st.error("Invalid username or password.")
+    if "code" in query_params:
+        try:
+            # Extract the code parameter
+            auth_code = query_params.get("code")
+
+            if auth_code:
+                # Fetch token using the authorization code
+                flow.fetch_token(code=auth_code)
+
+                credentials = flow.credentials
+                request = google.auth.transport.requests.Request()
+                id_info = id_token.verify_oauth2_token(credentials.id_token, request)
+
+                # Store user details in session state
+                st.session_state.logged_in = True
+                st.session_state.username = id_info["name"]
+                st.session_state.email = id_info["email"]
+
+                # Clear query parameters after login
+                st.query_params.clear()
+
+                # Force a rerun so that the else block executes
+                st.rerun()
+
+        except Exception as e:
+            st.error(f"Login failed: {e}")
+
 else:
-    # Logout button
-    if st.sidebar.button("Logout"):
-        st.session_state.logged_in = False
-        st.experimental_rerun()
+    # Sidebar with logout button
+    with st.sidebar:
+        st.title(f"Welcome, {st.session_state.username}!")
+        if st.button("Logout"):
+            st.session_state.logged_in = False
+            st.rerun()
 
-    # App content after login
-    st.sidebar.title(f"Welcome, {st.session_state.username}!")
-    st.sidebar.title("Navigation")
+        # Show available pages
+        st.title("Navigation")
+        page_path = "pages"
 
-    # Ensure the default page is 'All Pages'
-    default_page = "All Pages"
+        if not os.path.exists(page_path):
+            os.makedirs(page_path)
 
-    # Check if the default page exists in the list
-    if default_page.lower().replace(" ", "_") + ".py" not in os.listdir(page_path):
-        raise FileNotFoundError(f"The default page '{default_page}' does not exist in the pages directory!")
+        pages = [f.replace(".py", "").replace("_", " ").title() for f in os.listdir(page_path) if f.endswith(".py")]
 
-    # Get all .py files in the pages directory, excluding 'runner'
-    pages = [
-        file.replace(".py", "").replace("_", " ").title()
-        for file in os.listdir(page_path)
-        if file.endswith(".py") and file != "runner.py"
-    ]
+        if pages:
+            default_page = "All Pages"  # Set your default page name
+            if default_page in pages:
+                default_index = pages.index(default_page)
+            else:
+                default_index = 0  # Fallback to the first option if the default is missing
 
-    # Ensure the default page is included
-    if default_page not in pages:
-        pages.insert(0, default_page)
+            selected_page = st.selectbox("Select a Page", pages, index=default_index)
 
-    # Pre-select 'All Pages' on the first load
-    selected_page = st.sidebar.selectbox("Select a Page", pages, index=pages.index(default_page))
+    # Ensure the page content is rendered in the main area, not the sidebar
+    if selected_page:
+        page_file = selected_page.lower().replace(" ", "_") + ".py"
+        file_path = os.path.join(page_path, page_file)
 
-    # Display the selected page name
-    st.write(f"### {selected_page}")
-    st.write("This is the content for the selected page.")
+        if os.path.exists(file_path):
+            exec(open(file_path).read())  # Execute the selected page in the main content area
 
-    # Run the corresponding page (if dynamic loading is needed)
-    page_file = selected_page.lower().replace(" ", "_") + ".py"
-    page_file_path = os.path.join(page_path, page_file)
-
-    if os.path.exists(page_file_path):
-        exec(open(page_file_path).read())
-    else:
-        st.write("Selected page not found!")
