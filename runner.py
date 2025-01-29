@@ -23,7 +23,7 @@ decoded_json = json.loads(base64.b64decode(encoded_json).decode("utf-8"))
 flow = Flow.from_client_config(
     decoded_json,
     scopes=["openid", "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"],
-    redirect_uri="http://localhost:8501"
+    redirect_uri="https://lehem-hakfar-orders-c410830785c4.herokuapp.com"
 )
 
 # Initialize session state
